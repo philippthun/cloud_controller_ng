@@ -2,6 +2,7 @@ require 'sequel'
 require 'cloud_controller/db_migrator'
 require 'cloud_controller/db_connection/options_factory'
 require 'cloud_controller/db_connection/finalizer'
+require 'sequel/extensions/sql_metrics_logging'
 
 module VCAP::CloudController
   class DB
@@ -28,6 +29,14 @@ module VCAP::CloudController
       if opts[:log_db_queries]
         db.logger = logger
         db.sql_log_level = opts[:log_level]
+
+        db.extension :caller_logging
+        db.caller_logging_ignore = %r{(sql_metrics_logging|sequel_paginator)}
+        db.caller_logging_formatter = lambda do |caller|
+          "(#{caller.sub(%r{^.*/cloud_controller_ng/}, '')})"
+        end
+
+        db.extension(:sql_metrics_logging)
       end
       db.default_collate = 'utf8_bin' if db.database_type == :mysql
       add_connection_validator_extension(db, opts)
